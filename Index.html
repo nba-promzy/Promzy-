@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Queen Diana - Connect Your WhatsApp</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:sans-serif;background:linear-gradient(160deg,#1a0b2e,#0b141a);color:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+    .box{background:#1f2c34;padding:26px;border-radius:16px;width:90%;max-width:350px;text-align:center;border:1px solid #d4af3733;box-shadow:0 0 30px #d4af3722}
+    .crown{font-size:44px}
+    h1{margin:4px 0 0;font-size:24px;color:#d4af37;letter-spacing:1px}
+    .sub{color:#aaa;font-size:13px;margin-bottom:10px}
+    input,button{width:100%;padding:12px;margin-top:12px;border-radius:8px;border:0;font-size:16px}
+    button{background:#d4af37;color:#111;font-weight:bold;cursor:pointer}
+    button.danger{background:#e53935;color:#fff}
+    button:disabled{opacity:.6}
+    #code{font-size:30px;letter-spacing:3px;margin-top:16px;color:#25d366;font-weight:bold}
+    #msg{margin-top:10px;font-size:14px;color:#aaa}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="crown">👑</div>
+    <h1>QUEEN DIANA</h1>
+    <div class="sub">WhatsApp Bot - Connect with a pair code</div>
+
+    <div id="form">
+      <input id="num" placeholder="233501234567 (with country code)" inputmode="numeric">
+      <button id="btn" onclick="pair()">Get Pair Code</button>
+    </div>
+
+    <div id="code"></div>
+    <div id="msg"></div>
+
+    <button id="disc" class="danger hidden" onclick="disconnect()">Disconnect my bot</button>
+  </div>
+
+  <script>
+    let timer, poll, number;
+    const $ = id => document.getElementById(id);
+
+    async function pair() {
+      number = $('num').value.replace(/\D/g, '');
+      if (number.length < 10) return ($('msg').textContent = 'Enter a valid number with country code');
+
+      $('btn').disabled = true;
+      $('code').textContent = '';
+      $('msg').textContent = 'Generating code...';
+
+      try {
+        const r = await fetch('/pair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number })
+        });
+        const d = await r.json();
+
+        if (!d.success) {
+          $('msg').textContent = d.error;
+          $('btn').disabled = false;
+          return;
+        }
+
+        $('code').textContent = d.code;
+        startCountdown(60);
+        startPolling();
+      } catch (e) {
+        $('msg').textContent = 'Network error, try again';
+        $('btn').disabled = false;
+      }
+    }
+
+    function startCountdown(sec) {
+      clearInterval(timer);
+      let left = sec;
+      $('msg').textContent = `Enter this code in WhatsApp → Linked Devices → Link with phone number (${left}s)`;
+      timer = setInterval(() => {
+        left--;
+        if (left <= 0) {
+          clearInterval(timer);
+          clearInterval(poll);
+          $('code').textContent = '';
+          $('msg').textContent = 'Code expired. Try again.';
+          $('btn').disabled = false;
+        } else {
+          $('msg').textContent = `Enter this code in WhatsApp → Linked Devices → Link with phone number (${left}s)`;
+        }
+      }, 1000);
+    }
+
+    function startPolling() {
+      clearInterval(poll);
+      poll = setInterval(async () => {
+        const r = await fetch('/status/' + number);
+        const d = await r.json();
+        if (d.connected) {
+          clearInterval(poll);
+          clearInterval(timer);
+          $('form').classList.add('hidden');
+          $('code').textContent = '✅';
+          $('msg').textContent = 'Queen Diana is live on your WhatsApp! Send .menu in any chat.';
+          $('disc').classList.remove('hidden');
+        }
+      }, 2500);
+    }
+
+    async function disconnect() {
+      await fetch('/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number })
+      });
+      $('code').textContent = '';
+      $('msg').textContent = 'Bot disconnected.';
+      $('disc').classList.add('hidden');
+      $('form').classList.remove('hidden');
+      $('btn').disabled = false;
+    }
+  </script>
+</body>
+</html>
